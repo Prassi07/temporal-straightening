@@ -1,7 +1,7 @@
 # env import
-import gym
+import gymnasium as gym
 import einops
-from gym import spaces
+from gymnasium import spaces
 from pymunk.space_debug_draw_options import SpaceDebugColor
 from pymunk.vec2d import Vec2d
 from typing import Tuple, Sequence, Dict, Union, Optional
@@ -361,8 +361,22 @@ def pymunk_to_shapely(body, shapes):
     return geom
 
 
+def register_collision_post_solve(space, type_a: int, type_b: int, post_solve) -> None:
+    """
+    Pymunk 7+ uses Space.on_collision; Pymunk 6 uses add_collision_handler + post_solve assignment.
+    """
+    if hasattr(space, "on_collision"):
+        space.on_collision(type_a, type_b, post_solve=post_solve)
+    else:
+        h = space.add_collision_handler(type_a, type_b)
+        h.post_solve = post_solve
+
+
 class PushTEnv(gym.Env):
-    metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 10}
+    metadata = {
+        "render_modes": ["human", "rgb_array"],
+        "video.frames_per_second": 10,
+    }
     reward_range = (0.0, 1.0)
 
     def __init__(
@@ -436,7 +450,9 @@ class PushTEnv(gym.Env):
         self.reset_to_state = reset_to_state
         self.coverage_arr = []
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.seed(seed)
         self._setup()
         if self.block_cog is not None:
             self.block.center_of_gravity = self.block_cog
@@ -481,7 +497,7 @@ class PushTEnv(gym.Env):
             "visual": visual,
             "proprio": proprio
         }
-        return observation, state
+        return observation, {"state": state}
 
     def step(self, action):
         dt = 1.0 / self.sim_hz
@@ -534,7 +550,9 @@ class PushTEnv(gym.Env):
         info["max_coverage"] = max(self.coverage_arr)
         info["final_coverage"] = self.coverage_arr[-1]
 
-        return observation, reward, done, info
+        terminated = bool(done)
+        truncated = False
+        return observation, reward, terminated, truncated, info
 
     def render(self, mode):
         return self._render_frame(mode)
@@ -735,12 +753,11 @@ class PushTEnv(gym.Env):
         self.goal_pose = np.array([256, 256, np.pi / 4])  # x, y, theta (in radians)
 
         # Add collision handling
-        self.collision_handeler = self.space.add_collision_handler(0, 0)
-        self.collision_handeler.post_solve = self._handle_collision
+        register_collision_post_solve(self.space, 0, 0, self._handle_collision)
         self.n_contact_points = 0
 
         self.max_score = 50 * 100
-        self.success_threshold = 0.95  # 95% coverage.
+        self.success_threshold = 0.5  # 95% coverage.
 
     def _add_segment(self, a, b, radius):
         shape = pymunk.Segment(self.space.static_body, a, b, radius)

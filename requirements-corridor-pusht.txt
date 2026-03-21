@@ -1,0 +1,23 @@
+# Pip stack for Corridor Push-T + temporal-straightening training.
+# Create the conda env first (see environment-corridor-pusht.yaml), then either:
+#   pip install -r requirements-corridor-pusht.txt
+# or rely on the pip: section in that YAML.
+#
+# GPU (CUDA 12.1): install PyTorch *before* the rest, then install this file with --no-deps for torch lines, e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements-corridor-pusht.txt
+
+torch>=2.0.0
+torchvision>=0.15.0
+accelerate>=0.26.0
+einops>=0.4.0
+hydra-core>=1.2.0
+omegaconf>=2.3.0
+decord>=0.6.0
+tqdm>=4.60.0
+wandb>=0.13.0
+gymnasium>=0.29.0
+matplotlib>=3.5.0
+submitit>=1.4.0
+hydra-submitit-launcher>=1.2.0
+tensorboard>=2.10.0

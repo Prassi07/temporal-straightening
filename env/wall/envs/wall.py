@@ -2,7 +2,7 @@ import math
 from typing import Optional
 
 import torch
-import gym
+import gymnasium as gym
 import numpy as np
 import random
 
@@ -81,7 +81,7 @@ class DotWall(gym.Env):
         state = self.dot_position
         visual = self.channels_to_img(self.wall_img, self.dot_img)
         observation = {'visual': visual.float(), 'proprio': state.float()}
-        return observation, state
+        return observation, {"state": state}
 
     def step(self, action: torch.Tensor):
         self.dot_position = self._calculate_next_position(action)
@@ -93,7 +93,7 @@ class DotWall(gym.Env):
         info = {}
         info['state'] = self.dot_position
         info['pos_agent'] = self.dot_position
-        return observation, 0, False, info # observation, reward, done, info
+        return observation, 0.0, False, False, info
 
     def _calculate_next_position(self, action):
         next_dot_position = self._generate_transition(self.dot_position, action)

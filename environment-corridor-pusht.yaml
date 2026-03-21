@@ -1,0 +1,40 @@
+# Lightweight conda environment for Corridor Push-T: simulator, data collection, and train.py.
+# Does not include MuJoCo, D4RL, TensorFlow, etc. (see environment.yaml for the full paper stack).
+#
+# Create:
+#   conda env create -f environment-corridor-pusht.yaml
+#   conda activate corridor-pusht
+#
+# GPU PyTorch (recommended for training): after create, reinstall torch with CUDA wheels, e.g.:
+#   pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+name: corridor-pusht
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy>=1.23
+  - scipy>=1.9
+  - pillow>=9.0
+  - ffmpeg
+  - pygame>=2.5
+  - pymunk>=6.5
+  - shapely>=2.0
+  - opencv>=4.6
+  - scikit-image>=0.19
+  - pip
+  - pip:
+      - torch>=2.0.0
+      - torchvision>=0.15.0
+      - accelerate>=0.26.0
+      - einops>=0.4.0
+      - hydra-core>=1.2.0
+      - omegaconf>=2.3.0
+      - decord>=0.6.0
+      - tqdm>=4.60.0
+      - wandb>=0.13.0
+      - gymnasium>=0.29.0
+      - matplotlib>=3.5.0
+      - submitit>=1.4.0
+      - hydra-submitit-launcher>=1.2.0
+      - tensorboard>=2.10.0

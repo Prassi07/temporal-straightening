@@ -25,6 +25,19 @@ conda env create -f environment.yaml
 conda activate ts
 ```
 
+### Corridor Push-T (stochastic / risk-aware variant)
+
+For the Corridor Push-T simulator, data collection, and training **without** the full legacy stack (MuJoCo, D4RL, TensorFlow, etc.), use the smaller environment and read the walkthrough:
+
+```bash
+conda env create -f environment-corridor-pusht.yaml
+conda activate corridor-pusht
+```
+
+Environments use **[Gymnasium](https://gymnasium.farama.org/)** (`pip install gymnasium`), not the deprecated `gym` package.
+
+See **[docs/CORRIDOR_PUSHT_WALKTHROUGH.md](docs/CORRIDOR_PUSHT_WALKTHROUGH.md)** for file-by-file changes, costs, and commands.
+
 ### Mujoco
                     
 Create the `.mujoco` directory and download Mujoco210 using `wget`:

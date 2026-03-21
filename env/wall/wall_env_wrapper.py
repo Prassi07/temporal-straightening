@@ -84,7 +84,8 @@ class WallEnvWrapper(DotWall):
         """
         self.seed(seed)
         self.set_init_state(init_state)
-        obs, state = self.reset()
+        obs, info = self.reset()
+        state = info["state"]
         obs['visual'] = self.transform(obs['visual'])
         obs['visual'] = obs['visual'].permute(1, 2, 0)
         return obs, state
@@ -95,7 +96,8 @@ class WallEnvWrapper(DotWall):
         dones = []
         infos = []
         for action in actions:
-            o, r, d, info = self.step(action)
+            o, r, term, trunc, info = self.step(action)
+            d = term or trunc
             o['visual'] = self.transform(o['visual'])
             o['visual'] = o['visual'].permute(1, 2, 0)
             obses.append(o)

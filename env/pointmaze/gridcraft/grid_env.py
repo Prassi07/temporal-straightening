@@ -1,7 +1,6 @@
 import sys
 import numpy as np
-import gym
-import gym.spaces
+import gymnasium as gym
 
 from .grid_spec import REWARD, REWARD2, REWARD3, REWARD4, WALL, LAVA, TILES, START, RENDER_DICT
 from .utils import one_hot_to_flat, flat_to_one_hot
@@ -131,20 +130,23 @@ class GridEnv(gym.Env):
         self.__state = ns
         obs = ns #flat_to_one_hot(ns, len(self.gs))
 
-        done = False
         self._timestep += 1
+        truncated = False
         if self.max_timesteps is not None:
             if self._timestep >= self.max_timesteps:
-                done = True
-        return obs, r, done, traj_infos
+                truncated = True
+        terminated = False
+        return obs, r, terminated, truncated, traj_infos
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            np.random.seed(seed)
         start_idxs = np.array(np.where(self.gs.spec == START)).T
         start_idx = start_idxs[np.random.randint(0, start_idxs.shape[0])]
         start_idx = self.gs.xy_to_idx(start_idx)
         self.__state =start_idx
         self._timestep = 0
-        return start_idx #flat_to_one_hot(start_idx, len(self.gs))
+        return start_idx, {}
 
     def render(self, close=False, ostream=sys.stdout):
         if close:

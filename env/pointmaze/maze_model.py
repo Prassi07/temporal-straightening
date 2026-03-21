@@ -1,11 +1,21 @@
 """ A pointmass maze env."""
-from gym.envs.mujoco import mujoco_env
-from gym import utils
+from gymnasium.envs.mujoco import mujoco_env
+from gymnasium import utils
 from d4rl import offline_env
 from .dynamic_mjc import MJCModel
+from .maze_specs import (
+    OPEN,
+    U_MAZE,
+    U_MAZE_EVAL,
+    MEDIUM_MAZE,
+    MEDIUM_MAZE_EVAL,
+    LARGE_MAZE,
+    LARGE_MAZE_EVAL,
+    SMALL_MAZE,
+)
 import numpy as np
 import random
-import gym
+import gymnasium as gym
 
 WALL = 10
 EMPTY = 11
@@ -80,77 +90,6 @@ def point_maze(maze_str):
     actuator.motor(joint="ball_y", ctrlrange=[-1.0, 1.0], ctrllimited=True, gear=100)
 
     return mjcmodel
-
-
-LARGE_MAZE = \
-        "############\\"+\
-        "#OOOO#OOOOO#\\"+\
-        "#O##O#O#O#O#\\"+\
-        "#OOOOOO#OOO#\\"+\
-        "#O####O###O#\\"+\
-        "#OO#O#OOOOO#\\"+\
-        "##O#O#O#O###\\"+\
-        "#OO#OOO#OGO#\\"+\
-        "############"
-
-LARGE_MAZE_EVAL = \
-        "############\\"+\
-        "#OO#OOO#OGO#\\"+\
-        "##O###O#O#O#\\"+\
-        "#OO#O#OOOOO#\\"+\
-        "#O##O#OO##O#\\"+\
-        "#OOOOOO#OOO#\\"+\
-        "#O##O#O#O###\\"+\
-        "#OOOO#OOOOO#\\"+\
-        "############"
-
-MEDIUM_MAZE = \
-        '########\\'+\
-        '#OO##OO#\\'+\
-        '#OO#OOO#\\'+\
-        '##OOO###\\'+\
-        '#OO#OOO#\\'+\
-        '#O#OO#O#\\'+\
-        '#OOO#OG#\\'+\
-        "########"
-
-MEDIUM_MAZE_EVAL = \
-        '########\\'+\
-        '#OOOOOG#\\'+\
-        '#O#O##O#\\'+\
-        '#OOOO#O#\\'+\
-        '###OO###\\'+\
-        '#OOOOOO#\\'+\
-        '#OO##OO#\\'+\
-        "########"
-
-SMALL_MAZE = \
-        "######\\"+\
-        "#OOOO#\\"+\
-        "#O##O#\\"+\
-        "#OOOO#\\"+\
-        "######"
-
-U_MAZE = \
-        "#####\\"+\
-        "#GOO#\\"+\
-        "###O#\\"+\
-        "#OOO#\\"+\
-        "#####"
-
-U_MAZE_EVAL = \
-        "#####\\"+\
-        "#OOG#\\"+\
-        "#O###\\"+\
-        "#OOO#\\"+\
-        "#####"
-
-OPEN = \
-        "#######\\"+\
-        "#OOOOO#\\"+\
-        "#OOGOO#\\"+\
-        "#OOOOO#\\"+\
-        "#######"
 
 
 STATE_RANGES = np.array([
@@ -258,7 +197,9 @@ class MazeEnv(mujoco_env.MujocoEnv, utils.EzPickle, offline_env.OfflineEnv):
         info['target'] = self._target
         info['obs'] = ob if self.return_value == 'obs' else None
         info['pos_agent'] = state[:2]
-        return ob, reward, done, info
+        terminated = bool(done)
+        truncated = False
+        return ob, reward, terminated, truncated, info
 
     def _get_obs(self):
         obs = {
@@ -313,7 +254,9 @@ class MazeEnv(mujoco_env.MujocoEnv, utils.EzPickle, offline_env.OfflineEnv):
         self.set_target(target) 
         self.set_marker()
     
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.seed(seed)
         self.sim.reset()
         self.set_init_state(self.reset_to_state)
         state = self.reset_to_state
@@ -335,7 +278,7 @@ class MazeEnv(mujoco_env.MujocoEnv, utils.EzPickle, offline_env.OfflineEnv):
             visual = self._render_frame()
             obs["visual"] = visual
         state = state[:4] if self.with_target else state
-        return obs, state
+        return obs, {"state": state}
     
     def _render_frame(self):
         obs = self.sim.render(224, 224)

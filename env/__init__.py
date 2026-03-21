@@ -1,8 +1,14 @@
-from gym.envs.registration import register
-from .pointmaze import U_MAZE, MEDIUM_MAZE
+from gymnasium.envs.registration import register
+from .pointmaze.maze_specs import U_MAZE, MEDIUM_MAZE
 register(
     id="pusht",
     entry_point="env.pusht.pusht_wrapper:PushTWrapper",
+    max_episode_steps=300,
+    reward_threshold=1.0,
+)
+register(
+    id="corridor_pusht",
+    entry_point="env.pusht.corridor_pusht_wrapper:CorridorPushTWrapper",
     max_episode_steps=300,
     reward_threshold=1.0,
 )

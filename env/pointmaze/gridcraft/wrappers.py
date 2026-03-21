@@ -1,7 +1,7 @@
 import numpy as np
 from .grid_env import REWARD, GridEnv
 from .wrappers import ObsWrapper
-from gym.spaces import Box
+from gymnasium.spaces import Box
 
 
 class GridObsWrapper(ObsWrapper):

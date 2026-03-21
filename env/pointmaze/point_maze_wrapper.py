@@ -1,7 +1,7 @@
 import os
 import numpy as np
-import gym
-from env.pointmaze.maze_model import MazeEnv, U_MAZE, U_MAZE_EVAL
+from env.pointmaze.maze_model import MazeEnv
+from env.pointmaze.maze_specs import U_MAZE, U_MAZE_EVAL
 from utils import aggregate_dct
 
 STATE_RANGES = np.array([
@@ -83,7 +83,8 @@ class PointMazeWrapper(MazeEnv):
         self.prepare_for_render()
         self.seed(seed)
         self.set_init_state(init_state)
-        obs, state = self.reset()
+        obs, info = self.reset()
+        state = info["state"]
         return obs, state
 
     def step_multiple(self, actions):
@@ -95,7 +96,8 @@ class PointMazeWrapper(MazeEnv):
         dones = []
         infos = []
         for action in actions:
-            o, r, d, info = self.step(action)
+            o, r, term, trunc, info = self.step(action)
+            d = term or trunc
             obses.append(o)
             rewards.append(r)
             dones.append(d)

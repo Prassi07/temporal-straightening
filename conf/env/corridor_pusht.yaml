@@ -1,0 +1,20 @@
+name: corridor_pusht
+save_name: corridor_pusht
+args: []
+kwargs:
+  with_velocity: true
+  with_target: true
+
+dataset:
+  _target_: "datasets.corridor_pusht_dset.load_corridor_pusht_slice_train_val"
+  with_velocity: true
+  n_rollout: null
+  normalize_action: ${normalize_action}
+  data_path: ${oc.env:DATASET_DIR}/corridor_pusht
+  split_ratio: 0.9
+  transform:
+    _target_: "datasets.img_transforms.default_transform"
+    img_size: ${img_size}
+
+decoder_path: null
+num_workers: 16
