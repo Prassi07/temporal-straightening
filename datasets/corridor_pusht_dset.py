@@ -12,7 +12,8 @@ from .traj_dset import TrajDataset, TrajSlicerDataset
 
 decord.bridge.set_bridge("torch")
 
-# Default normalization for spline control points in [0, 512]; override after computing dataset stats.
+# Defaults assume relative actions (offsets from agent pos at commit time) are
+# already centered near zero. Override with dataset-computed stats for best results.
 ACTION_MEAN = torch.zeros(8)
 ACTION_STD = torch.ones(8)
 STATE_MEAN = torch.zeros(7)
@@ -23,8 +24,17 @@ PROPRIO_STD = torch.ones(4)
 
 class CorridorPushTDataset(TrajDataset):
     """
-    Corridor Push-T: 8-D spline actions (`actions.pth`), same video layout as PushTDataset.
-    Optional `costs.pth` (T, 1) per episode for Evidential training.
+    Corridor Push-T dataset.
+
+    Actions are robot-centric 8-D spline control points (``actions_relative.pth``):
+    four 2-D offsets from the agent position at the time the chunk was committed.
+    This representation is translation-invariant and better suited for learning.
+
+    Per-step state labels loaded alongside observations:
+      - goal_reached  (N, T, 1) float32 — 1.0 when block is within success_radius of goal
+      - wall_contact  (N, T, 1) float32 — 1.0 when block touched a corridor wall
+      - distances     (N, T, 1) float32 — block-to-goal Euclidean distance in pixels
+      - goal_poses    (N, T, 3) float32 — [goal_x, goal_y, goal_theta] for the episode
     """
 
     def __init__(
@@ -38,11 +48,10 @@ class CorridorPushTDataset(TrajDataset):
         self.data_path = Path(data_path)
         self.transform = transform
         self.normalize_action = normalize_action
-        self.states = torch.load(self.data_path / "states.pth").float()
-        self.actions = torch.load(self.data_path / "actions.pth").float()
 
-        costs_path = self.data_path / "costs.pth"
-        self.costs = torch.load(costs_path).float() if costs_path.exists() else None
+        self.states = torch.load(self.data_path / "states.pth", weights_only=True).float()
+        # Robot-centric relative control points
+        self.actions = torch.load(self.data_path / "actions_relative.pth", weights_only=True).float()
 
         with open(self.data_path / "seq_lengths.pkl", "rb") as f:
             self.seq_lengths = pickle.load(f)
@@ -60,13 +69,17 @@ class CorridorPushTDataset(TrajDataset):
         self.states = self.states[:n]
         self.actions = self.actions[:n]
         self.seq_lengths = self.seq_lengths[:n]
-        if self.costs is not None:
-            self.costs = self.costs[:n]
+
+        # Per-step state labels
+        self.goal_reached = torch.load(self.data_path / "goal_reached.pth", weights_only=True).float()[:n]
+        self.wall_contact = torch.load(self.data_path / "wall_contact.pth", weights_only=True).float()[:n]
+        self.distances = torch.load(self.data_path / "distances.pth", weights_only=True).float()[:n]
+        self.goal_poses = torch.load(self.data_path / "goal_poses.pth", weights_only=True).float()[:n]
 
         self.proprios = self.states[..., :2].clone()
         self.with_velocity = with_velocity
         if with_velocity:
-            self.velocities = torch.load(self.data_path / "velocities.pth").float()[:n]
+            self.velocities = torch.load(self.data_path / "velocities.pth", weights_only=True).float()[:n]
             self.states = torch.cat([self.states, self.velocities], dim=-1)
             self.proprios = torch.cat([self.proprios, self.velocities], dim=-1)
 
@@ -105,6 +118,7 @@ class CorridorPushTDataset(TrajDataset):
     def get_frames(self, idx, frames):
         vid_dir = self.data_path / "obses"
         reader = VideoReader(str(vid_dir / f"episode_{idx:03d}.mp4"), num_threads=1)
+        frames = list(frames)
         act = self.actions[idx, frames]
         state = self.states[idx, frames]
         proprio = self.proprios[idx, frames]
@@ -115,9 +129,13 @@ class CorridorPushTDataset(TrajDataset):
         if self.transform:
             image = self.transform(image)
         obs = {"visual": image, "proprio": proprio}
-        meta = {"shape": shape}
-        if self.costs is not None:
-            meta["cost"] = self.costs[idx, frames]
+        meta = {
+            "shape": shape,
+            "goal_reached": self.goal_reached[idx, frames],
+            "wall_contact": self.wall_contact[idx, frames],
+            "distances": self.distances[idx, frames],
+            "goal_poses": self.goal_poses[idx, frames],
+        }
         return obs, act, state, meta
 
     def __getitem__(self, idx):
@@ -132,7 +150,6 @@ def load_corridor_pusht_slice_train_val(
     n_rollout=None,
     data_path="data/corridor_pusht",
     normalize_action=True,
-    split_ratio=0.8,
     num_hist=0,
     num_pred=0,
     frameskip=0,

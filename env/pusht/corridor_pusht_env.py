@@ -105,7 +105,7 @@ class CorridorPushTEnv(PushTEnv):
         friction_low: float = 0.15,
         friction_high: float = 1.05,
         # Agent velocity cap (px/s, applied each substep)
-        agent_max_speed: float = 300.0,
+        agent_max_speed: float = 50.0,
         # OU noise on top of PID velocity
         ou_theta: float = 4.0,
         ou_sigma: float = 10.0,
@@ -294,11 +294,10 @@ class CorridorPushTEnv(PushTEnv):
         self.space.add(body, circ)
 
     def _render_frame(self, mode):
-        # Suppress the T-shape goal marker when we're using the radius-based goal;
-        # we'll draw the circle ourselves.
+        # Always suppress the parent's T-shape goal marker — we use a position-based
+        # criterion and draw our own indicator (circle) only when draw_goal_radius=True.
         _saved_goal_color = self.goal_color
-        if self.draw_goal_radius and self._success_radius_px is not None:
-            self.goal_color = pygame.Color("White")
+        self.goal_color = pygame.Color("White")
 
         img = super()._render_frame(mode)
 

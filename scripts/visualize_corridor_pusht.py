@@ -54,7 +54,7 @@ def parse_args():
     p.add_argument("--fps", type=int, default=10)
     p.add_argument("--render-size", type=int, default=512, help="Resolution (larger = clearer preview)")
     p.add_argument("--out", type=str, default="viz_corridor_pusht", help="Output directory for --mode save")
-    p.add_argument("--jitter", type=float, default=0.0, help="Expert control-point jitter (0 = none)")
+    p.add_argument("--jitter", type=float, default=5.0, help="Expert control-point jitter (0 = none)")
     p.add_argument(
         "--expert-hold-coverage",
         type=float,
@@ -108,6 +108,13 @@ def parse_args():
         "--debug-steps",
         action="store_true",
         help="Shorthand: --log-every-step --step-delay 0.25",
+    )
+    p.add_argument(
+        "--chunk-size",
+        type=int,
+        default=4,
+        metavar="K",
+        help="Open-loop chunk length: expert replans every K steps (default 4).",
     )
     return p.parse_args()
 
@@ -212,7 +219,7 @@ def main():
     success_radius = getattr(env, "_success_radius_px", None)
     goal_mode = f"radius={success_radius:.1f}px" if success_radius is not None else f"coverage>={success_thr}"
     print(
-        f"CorridorPushT viz  seed={seed}  goal_mode={goal_mode}  "
+        f"CorridorPushT viz  seed={seed}  goal_mode={goal_mode}  chunk_size={args.chunk_size}  "
         f"random_goal={not args.no_random_goal}  random_corridor_w={not args.no_random_corridor_width}  "
         f"jitter={args.jitter}  log_steps={args.log_every_step}  step_delay={args.step_delay}"
     )
@@ -241,17 +248,23 @@ def main():
                 show_frame(env, obs["visual"], args.fps)
 
             n_hold_steps = 0
+            current_action = None
+
             for t in range(args.horizon):
                 dist_pre = env.block_goal_distance()
-                reached_pre = env.is_goal_reached()
-                a = expert_action(
-                    env, rng, margin, ws, args.jitter, args.expert_hold_coverage
-                )
-                is_hold = action_is_hold(a)
+
+                # Replan at the start of each open-loop chunk
+                is_commit = (t % args.chunk_size == 0)
+                if is_commit:
+                    current_action = expert_action(
+                        env, rng, margin, ws, args.jitter, args.expert_hold_coverage
+                    )
+
+                is_hold = action_is_hold(current_action)
                 if is_hold:
                     n_hold_steps += 1
 
-                obs, rew, _term, _trunc, info = env.step(a)
+                obs, rew, _term, _trunc, info = env.step(current_action)
                 dist_post = float(info.get("block_goal_distance", env.block_goal_distance()))
                 reached_post = bool(info.get("goal_reached", False))
                 corr_step = bool(info.get("corridor_contact", False))
@@ -259,9 +272,10 @@ def main():
 
                 if args.log_every_step:
                     act_tag = "HOLD" if is_hold else "push"
+                    chunk_tag = f"[chunk {t // args.chunk_size}]" if is_commit else f"  (open {t % args.chunk_size}/{args.chunk_size})"
                     reach_tag = "REACHED" if reached_post else f"dist={dist_post:.1f}/{success_radius or success_thr}"
                     print(
-                        f"  ep{ep} t{t:3d}  dist_pre={dist_pre:.1f}→{dist_post:.1f}  "
+                        f"  ep{ep} t{t:3d} {chunk_tag}  dist={dist_pre:.1f}→{dist_post:.1f}  "
                         f"rew={float(rew):.3f}  act={act_tag}  {reach_tag}  "
                         f"wall={corr_step} (ep={corr_ep})",
                         flush=True,
