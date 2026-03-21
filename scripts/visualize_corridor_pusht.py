@@ -276,19 +276,18 @@ def main():
                 if args.mode == "human":
                     show_frame(env, obs["visual"], args.fps)
 
-            cost = env.compute_episode_cost()
             jam = getattr(env, "_corridor_contact_episode", False)
             min_d = getattr(env, "_min_goal_distance_episode", float("inf"))
+            reached = env.episode_goal_reached()
             success_str = (
-                f"reached={min_d <= success_radius:.0f}  min_dist={min_d:.1f}/{success_radius:.1f}px"
+                f"reached={int(reached)}  min_dist={min_d:.1f}/{success_radius:.1f}px"
                 if success_radius is not None
-                else f"max_cov={max(env.coverage_arr):.3f}" if env.coverage_arr else "no_steps"
+                else f"reached={int(reached)}  max_cov={max(env.coverage_arr):.3f}" if env.coverage_arr else "no_steps"
             )
             print(
                 f"episode {ep}: half_w={hw:.1f}  "
                 f"goal=({goal[0]:.1f},{goal[1]:.1f})  "
-                f"{success_str}  hold={n_hold_steps}/{args.horizon}  "
-                f"cost={cost:.2f}  jam={jam}"
+                f"{success_str}  hold={n_hold_steps}/{args.horizon}  jam={jam}"
             )
 
             if args.mode == "save":

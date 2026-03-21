@@ -1,6 +1,6 @@
 """
 Corridor Push-T: narrow channel + aleatoric dynamics (CoM, friction), spline actions,
-PID tracking with OU execution noise, and continuous episode cost labels.
+PID tracking with OU execution noise, and per-step state labels.
 Physics uses PyMunk (same stack as PushTEnv).
 """
 from __future__ import annotations
@@ -57,11 +57,12 @@ class OUNoise2D:
 
 class CorridorPushTEnv(PushTEnv):
     """
-    - Parallel corridor walls inside the workspace (jam = catastrophic).
-    - Randomized T-block CoM and friction each episode.
-    - Action: K=4 control points in R^8 (cubic Bezier in the plane).
-    - PID tracks the Bezier; OU noise is added to the commanded velocity each substep.
-    - Cost label: 0 success, 0.5 safe halt, 10.0 wall jam (see _compute_episode_cost).
+    Corridor Push-T environment.
+
+    - Parallel corridor walls; wall contact is a hard failure signal.
+    - Randomized T-block CoM and friction each episode (aleatoric variability).
+    - Action: 8-D cubic Bézier control points; PD controller tracks curve; OU noise on velocity.
+    - Per-step state labels stored in info: goal_reached, corridor_contact, block_goal_distance.
     """
 
     metadata = {
@@ -108,11 +109,7 @@ class CorridorPushTEnv(PushTEnv):
         # OU noise on top of PID velocity
         ou_theta: float = 4.0,
         ou_sigma: float = 10.0,
-        # Cost / success
-        cost_jam: float = 10.0,
-        cost_safe_halt: float = 0.5,
-        cost_success: float = 0.0,
-        halt_speed_thresh: float = 2.0,
+        # Goal success criterion
         success_threshold: float = 0.6,
         success_radius_px: Optional[float] = 40.0,
         draw_goal_radius: bool = False,
@@ -134,10 +131,6 @@ class CorridorPushTEnv(PushTEnv):
         self.friction_high = friction_high
         self.ou_theta = ou_theta
         self.ou_sigma = ou_sigma
-        self.cost_jam = cost_jam
-        self.cost_safe_halt = cost_safe_halt
-        self.cost_success = cost_success
-        self.halt_speed_thresh = halt_speed_thresh
         self.agent_max_speed = float(agent_max_speed)
         self._success_radius_px = float(success_radius_px) if success_radius_px is not None else None
         self.draw_goal_radius = bool(draw_goal_radius)
@@ -539,16 +532,9 @@ class CorridorPushTEnv(PushTEnv):
         return observation, reward, terminated, truncated, info
 
     def episode_goal_reached(self) -> bool:
-        """True if the goal was reached at any step this episode."""
+        """True if the goal was reached at any step during this episode."""
         min_d = self._min_goal_distance_episode
         if self._success_radius_px is not None:
             return min_d <= self._success_radius_px
         cov = max(self.coverage_arr) if self.coverage_arr else 0.0
         return cov >= self.success_threshold
-
-    def compute_episode_cost(self) -> float:
-        """Scalar cost for the episode. Wall jam is not penalised if the goal was reached first."""
-        goal_ok = self.episode_goal_reached()
-        if self._corridor_contact_episode and not goal_ok:
-            return self.cost_jam
-        return self.cost_success if goal_ok else self.cost_safe_halt

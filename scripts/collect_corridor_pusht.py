@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Collect Corridor Push-T rollouts (8-D spline actions, continuous cost).
+Collect Corridor Push-T rollouts (8-D spline actions, per-step state labels).
 
 Mixed collection (default 70% expert / 30% exploration):
   - Expert: geometric cubic Bézier from agent → block → goal (see env.pusht.corridor_expert).
   - Exploration: large noise on expert splines and/or uniform random splines to cover jams/failures.
+
+Per-step state labels saved: goal_reached, wall_contact, block_goal_distance.
+Downstream code computes reward shaping from these raw signals.
 
 Example:
   python scripts/collect_corridor_pusht.py --out data/corridor_pusht --n-episodes 10000 --horizon 50
