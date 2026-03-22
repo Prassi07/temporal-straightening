@@ -249,7 +249,7 @@ class Trainer:
         return ckpt_path, model_name, model_epoch
 
     def load_ckpt(self, filename="model_latest.pth"):
-        ckpt = torch.load(filename)
+        ckpt = torch.load(filename, weights_only=False)
         self._loaded_optim_state = {}
         for k, v in ckpt.items():
             if k.endswith("_optimizer") and isinstance(v, dict):

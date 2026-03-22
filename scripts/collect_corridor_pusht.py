@@ -90,9 +90,10 @@ def parse_args():
     p.add_argument(
         "--chunk-size",
         type=int,
-        default=4,
+        default=8,
         metavar="K",
-        help="Open-loop chunk length: policy commits a new spline every K steps (default 4).",
+        help="Open-loop chunk length: policy commits a new spline every K steps (default 8). "
+             "Match this to num_hist+num_pred in conf/train_corridor_pusht.yaml (also 8).",
     )
     # --- Randomization controls (mirrored from visualize_corridor_pusht) ---
     p.add_argument(

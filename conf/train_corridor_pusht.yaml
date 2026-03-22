@@ -1,0 +1,97 @@
+defaults:
+  - _self_
+  - env: corridor_pusht
+  - encoder: scratch_resnet
+  - action_encoder: proprio
+  - proprio_encoder: proprio
+  - decoder: transposed_conv
+  - predictor: vit
+  - override hydra/launcher: submitit_slurm
+
+# --- Paths ---
+ckpt_base_path: ./checkpoints
+
+hydra:
+  run:
+    dir: ${ckpt_base_path}/test/${oc.select:env.save_name,${env.name}}_${replace_substring:${training.straighten},agg,agg${oc.select:encoder.agg_type,}}_agg32_proj${oc.select:encoder.projector,none}_dim${oc.select:encoder.projector_out_dim,384}_hw${oc.select:encoder.projector_target_hw,14}_sg${training.stop_grad}_lr${training.encoder_lr}
+  sweep:
+    dir: ${ckpt_base_path}/test/${oc.select:env.save_name,${env.name}}_${replace_substring:${training.straighten},agg,agg${oc.select:encoder.agg_type,}}_agg32_proj${oc.select:encoder.projector,none}_dim${oc.select:encoder.projector_out_dim,384}_hw${oc.select:encoder.projector_target_hw,14}_sg${training.stop_grad}_lr${training.encoder_lr}
+    subdir: ${hydra.job.num}
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+    nodes: 1
+    tasks_per_node: 1
+    cpus_per_task: 8
+    mem_gb: 512
+    gres: "gpu:h100:1"
+    timeout_min: 2880
+    setup: ["export DEBUGVAR=$(scontrol show hostnames $SLURM_JOB_NODELIST)",
+            export MASTER_ADDR="$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)",
+            "export MASTER_PORT=$(for port in $(shuf -i 30000-65500 -n 20); do if [[ $(netstat -tupln 2>&1 | grep $port | wc -l) -eq 0 ]] ; then echo $port; break; fi; done;)",]
+
+training:
+  seed: 0
+  epochs: 100
+  batch_size: 32
+  save_every_x_epoch: 5
+  save_every_x_iterations: 1000
+  # Phase A: keep False until z_loss stabilises (~10-20 epochs).
+  # Phase B: set to cos1e-3, then cos1e-2, then cos1e-1 as curvature loss is ramped up.
+  straighten: False
+  decoder_start_epoch: 1
+  reconstruct_every_x_batch: 1000
+  num_reconstruct_samples: 5
+  encoder_lr: 1e-5
+  decoder_lr: 3e-4
+  predictor_lr: 5e-4
+  action_encoder_lr: 5e-4
+  stop_grad: True
+  vcreg: False
+  vcreg_apply_to: "enc"
+  vcreg_std_coeff: 0
+  vcreg_cov_coeff: 0
+  mixed_precision: bf16
+
+img_size: 224
+concat_dim: 1
+
+normalize_action: True
+
+# --- Action encoder ---
+# action_dim = 8 (relative 8-D Bezier CPs); 16 = 2x clean repeat, or a Conv1d projection.
+action_emb_dim: 16
+num_action_repeat: 1
+
+# --- Proprio encoder ---
+# proprio_dim = 4 (x, y, vx, vy); 16 = 4x clean repeat, or a Conv1d projection.
+proprio_emb_dim: 16
+num_proprio_repeat: 1
+
+# --- Sequence window ---
+# chunk_size=8 in the collect script; frameskip=1 means each training frame is one raw step.
+# num_hist=7 + num_pred=1 = 8 frames = exactly one open-loop chunk.
+# The curvature loss therefore always evaluates a single spline commitment — no boundary crossing.
+frameskip: 1
+num_hist: 7
+num_pred: 1
+
+has_predictor: True
+has_decoder: True
+
+model:
+  _target_: models.visual_world_model.VWorldModel
+  image_size: ${img_size}
+  num_hist: ${num_hist}
+  num_pred: ${num_pred}
+  train_encoder: True
+  train_predictor: True
+  train_decoder: True
+
+plan_settings:
+  plan_cfg_path: null
+  planner: ['gd', 'cem']
+  goal_source: ['dset', 'random_state']
+  goal_H: [5]
+  alpha: [0.1, 1]
+
+debug: False

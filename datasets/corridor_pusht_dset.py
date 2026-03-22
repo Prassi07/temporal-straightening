@@ -49,9 +49,9 @@ class CorridorPushTDataset(TrajDataset):
         self.transform = transform
         self.normalize_action = normalize_action
 
-        self.states = torch.load(self.data_path / "states.pth", weights_only=True).float()
+        self.states = torch.load(self.data_path / "states.pth", weights_only=False).float()
         # Robot-centric relative control points
-        self.actions = torch.load(self.data_path / "actions_relative.pth", weights_only=True).float()
+        self.actions = torch.load(self.data_path / "actions_relative.pth", weights_only=False).float()
 
         with open(self.data_path / "seq_lengths.pkl", "rb") as f:
             self.seq_lengths = pickle.load(f)
@@ -71,15 +71,15 @@ class CorridorPushTDataset(TrajDataset):
         self.seq_lengths = self.seq_lengths[:n]
 
         # Per-step state labels
-        self.goal_reached = torch.load(self.data_path / "goal_reached.pth", weights_only=True).float()[:n]
-        self.wall_contact = torch.load(self.data_path / "wall_contact.pth", weights_only=True).float()[:n]
-        self.distances = torch.load(self.data_path / "distances.pth", weights_only=True).float()[:n]
-        self.goal_poses = torch.load(self.data_path / "goal_poses.pth", weights_only=True).float()[:n]
+        self.goal_reached = torch.load(self.data_path / "goal_reached.pth", weights_only=False).float()[:n]
+        self.wall_contact = torch.load(self.data_path / "wall_contact.pth", weights_only=False).float()[:n]
+        self.distances = torch.load(self.data_path / "distances.pth", weights_only=False).float()[:n]
+        self.goal_poses = torch.load(self.data_path / "goal_poses.pth", weights_only=False).float()[:n]
 
         self.proprios = self.states[..., :2].clone()
         self.with_velocity = with_velocity
         if with_velocity:
-            self.velocities = torch.load(self.data_path / "velocities.pth", weights_only=True).float()[:n]
+            self.velocities = torch.load(self.data_path / "velocities.pth", weights_only=False).float()[:n]
             self.states = torch.cat([self.states, self.velocities], dim=-1)
             self.proprios = torch.cat([self.proprios, self.velocities], dim=-1)
 

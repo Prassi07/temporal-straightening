@@ -112,9 +112,9 @@ def parse_args():
     p.add_argument(
         "--chunk-size",
         type=int,
-        default=4,
+        default=8,
         metavar="K",
-        help="Open-loop chunk length: expert replans every K steps (default 4).",
+        help="Open-loop chunk length: expert replans every K steps (default 8).",
     )
     return p.parse_args()
 
